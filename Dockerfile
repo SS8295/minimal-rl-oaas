@@ -13,7 +13,8 @@ WORKDIR /Workspace
 COPY requirements.txt .
 # Install all requirements from requirements.txt
 RUN pip install -r requirements.txt
+RUN pip install gym
 # Adding our python file to the root folder of the container
-COPY ./environments ./environments
+#COPY ./ ./minimal_rl_oaas/
 # Run some commands after creation
 #CMD ["python", "./environments/test.py"]
