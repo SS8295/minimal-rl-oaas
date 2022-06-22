@@ -1,0 +1,1 @@
+docker run -it --privileged -p 8888:8888 --env="DISPLAY" -v "/$(pwd)/":"/minimal-rl-oaas" initial_test

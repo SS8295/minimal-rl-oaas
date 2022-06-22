@@ -10,10 +10,14 @@ RUN apt-get install -y python3-pip
 # Create a root folder
 WORKDIR /Workspace
 # Copy requirements in the current directory
-COPY requirements.txt .
+#COPY requirements.txt .
 # Install all requirements from requirements.txt
-RUN pip install -r requirements.txt
+#RUN pip install -r requirements.txt
 RUN pip install gym
+RUN pip install matplotlib
+RUN pip install pyyaml
+#RUN pip install pyqt5
+#RUN sudo apt-get install python-tk
 # Adding our python file to the root folder of the container
 #COPY ./ ./minimal_rl_oaas/
 # Run some commands after creation
