@@ -21,13 +21,14 @@ class OaasEnv(Env):
     def __init__(self, floorplan):
         
         # Grid Size
+        self.floorplan = floorplan
         #self.floorplan = floorplan
         self.grid_size = len(floorplan) #len(floorplan)
         self.allowed_floorplan = allowed_floorplan(floorplan)
         #print(self.allowed_floorplan)
         #sys.exit(0)
         #Agents in Environment
-        self.num_agents = 5
+        self.num_agents = 3
         self.num_tasks = 1
         # Action Enumeration
         self.num_actions = 5
@@ -56,9 +57,6 @@ class OaasEnv(Env):
             self.observation_space.append(spaces.Box(np.float32(low), np.float32(high)))
         print("Observation Space = ", self.observation_space)
         print("Action Space = ",self.action_space)
-        #self.observation_size = self.obs()
-        #self.observation_size = len(self.observation_size)
-        #print(self.observation_size)
 
     def step(self, action_list):
 
@@ -90,7 +88,7 @@ class OaasEnv(Env):
     def render(self,iter):
         print("I will render")
         fig,ax = plt.subplots(1)
-        fig.subplots_adjust(bottom=0.3)
+        fig.subplots_adjust(bottom=0.4)
         colorstate = np.zeros((self.grid_size, self.grid_size,3),dtype=np.uint8)
         colorstate = color_walls(colorstate, self.allowed_floorplan)
 
@@ -99,7 +97,7 @@ class OaasEnv(Env):
             colorstate[self.agent_dict['player'+str(player_int)].x][self.agent_dict['player'+str(player_int)].y] = (150, 55, 255)
 
         # Render Tasks      
-        colorstate[self.task_dict['task1'].x][self.task_dict['task1'].y] = (255, 0, 0)
+        colorstate[self.task_dict['task1'].x][self.task_dict['task1'].y] = (255, 165, 0)
         #colorstate[self.agent_dict['player'+str(self.num_agents)].x][self.agent_dict['player'+str(self.num_agents)].y] = (255, 50, 50)
         ax.imshow(colorstate, interpolation='None')
         ax.axis('off')
@@ -107,14 +105,17 @@ class OaasEnv(Env):
         for player in range(self.num_agents):
             x_coord = self.agent_dict['player'+str(player)].x
             y_coord = self.agent_dict['player'+str(player)].y
-            fig.text(0.3,0.25-0.05*player,f'Player {player}: ({x_coord},{y_coord})')
+            dist = astar(self.floorplan, self.agent_dict['player'+str(player)].coords, self.task_dict['task1'].coords)
+            fig.text(0.3,0.3-0.05*player,f'Employee {player}: ({x_coord},{y_coord})     Distance to task = {len(dist)}')
+            #fig.text(0.5,0.25-0.05*player,f'Distance to task: ',len(astar(self.floorplan, self.agent_dict['player'+str(player)].coords, self.task_dict['task1'].coords)))
         #x_coord_adv = self.agent_dict['player'+str(self.num_agents)].x
         #y_coord_adv = self.agent_dict['player'+str(self.num_agents)].y
-        #fig.text(0.3,0.15,f'Adversary: ({x_coord_adv},{y_coord_adv})')
+        (x_task, y_task) = self.task_dict['task1'].coords
+        fig.text(0.3,0.05,f'Task coords: ({x_task},{y_task})')
         #fig.text(0.3,0.10,f'Targets: ({self.target1_x},{self.target1_y}) and ({self.target2_x},{self.target2_y})')
-        fig.text(0.55,0.25, f'Iteration: {iter}')
+        #fig.text(0.55,0.25, f'Iteration: {iter}')
         #plt.savefig(f'saved_images/out_{iter}.png')
-        plt.savefig(fname='./renders/live_render')
+        plt.savefig(fname='./renders/live_render'+str(iter))
 
     def reset(self):
 

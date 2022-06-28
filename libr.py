@@ -11,6 +11,7 @@ class Employee:
     - Assigned task
     '''
     def __init__(self, grid_size, allowed_floorplan):
+        self.grid_size = grid_size
         self.allowed_floorplan = allowed_floorplan
         self.reward = 0
         self.coords = random.sample(self.allowed_floorplan,k=1)[0]

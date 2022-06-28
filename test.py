@@ -2,42 +2,51 @@ from customoaas import *
 import numpy as np
 import yaml
 from libr_floorplan import *
+import json
+import sys
+import os
+import pathlib
 
-#floorplan = [[0,0,0],[1,0,1],[0,0,0]]
 
-#start = (0,0)
-#end = (2,2)
+#print('getcwd:      ', os.getcwd())
+#print('__file__:    ', __file__)
+#print(os.getcwd())
+#sys.exit(0)
 
+# Opening JSON file
+with open('map.json') as json_file:
+    vitaly_floorplan = json.load(json_file)
 
-#path = astar(floorplan, start, end)
-#print(path)
+#print(vitaly_floorplan['map']['height'])
+#print(vitaly_floorplan['map']['width'])
 
-with open('config.yaml') as f:
-    floorplan = yaml.safe_load(f)
+#print(vitaly_floorplan['map']['height'])
+
+floorplan = np.zeros((vitaly_floorplan['map']['width']+1, vitaly_floorplan['map']['height']+1))
+#print(floorplan.shape)
+#sys.exit(0)
+
+for coor in vitaly_floorplan['map']['points']:
+
+    #print(coor)
+    if coor['value'] == 255:
+    #    print(coor)
+    #    print('x = ',coor['x'])
+    #    print('y = ',coor['y'])
+        floorplan[coor['x']][coor['y']] = 1
+
+#print(floorplan)
+#sys.exit(0)
+
+#print(diogos_floorplan[0])
+#sys.exit(0)
 
 env = OaasEnv(floorplan)
 env.render(0)
 
-#if (1,5) in allowed_floorplan:
-#    print("were in")
-#new_task_coords = (4,5)
-#print(env.agent_dict['player0'].coords)
-#print(floorplan)
-#sys.exit(0)
-
-#print(floorplan)
-#start = (1,1)
-#end = (3,2)
-#print(minPushBox(floorplan, start, end))
-#sys.exit(0)
-
-#path = astar(np.array(floorplan), (1,1), (1,7))
-#path = astar(floorplan, (8,7), (1,7))
-#path = astar(floorplan, (6,5), (1,7))
-#path = astar(floorplan, (8,8), (1,7))
-#path = astar(floorplan, (1,5), (1,7))
-
-
 for employee in env.agent_dict:
     dist = astar(floorplan, env.agent_dict[employee].coords, env.task_dict['task1'].coords)
     print("Length of agent", employee, "=" , len(dist))
+
+env.agent_dict['player1'].move(3)
+env.render(1)
