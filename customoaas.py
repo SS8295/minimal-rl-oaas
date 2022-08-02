@@ -45,71 +45,56 @@ class OaasEnv(Env):
         self.num_employees = len(self.employee_list)
         self.num_tasks = len(self.task_list)
         
+        # Variables saved for data analysis
         self.curr_assignments = []
         self.finished_tasks = []
-
-        # Observation and Action Space
-        #low = np.zeros(4*(self.num_employees))
-        #high = np.full(4*(self.num_employees), self.grid_size)
-
-        #self.action_space = spaces.Discrete(5)
-        #self.observation_space = spaces.Box(np.float32(low), np.float32(high))
-        #print("Observation Space = ", self.observation_space)
-        #print("Action Space = ",self.action_space)
 
     def progress_time(self, curr_time, curr_employees):
         '''
         Takes the current (passed) time and the head count of the store and updates the status
         of the tasks based on the confluence diagram.
 
-        Inputs:
-                - Current time
-                - Current Employees
-        Ouput:
-                - Changes internally the self.employee_df and self.task_df variables accordingly 
-        
+        Inputs:     Current time                    datetime()
+                    Current Employees               pd.Dataframe()
         '''
-
-        # The following changes the self.employee_df and self.task_df based on the self.curr_assignments
+        
         for assignment in self.curr_assignments:
 
-            employee_present_flag = False
+            employee_present = False
             finish_threshold = False
 
-            # Preproceess employee and time elapsed flag
-
-            if assignment['TIME_ASSIGNED'] + timedelta(minutes = assignment['TASK_DURATION'].item()) < curr_time:
+            # Preproceess employee_present and finish_threshold flags
+            print("ASSIGNMENT = ",assignment)
+            #print(assignment['TIME_ASSIGNED'])
+            #print("assignment duration = ",assignment['TASK_DURATION'].item())
+            #print(assignment['TASK_DURATION'].item())
+            #print(timedelta(minutes = assignment['TASK_DURATION'].item()))
+            #print(assignment['TIME_ASSIGNED'] + timedelta(minutes = assignment['TASK_DURATION'].item()))
+            #print(curr_time)
+            if assignment['TIME_ASSIGNED'] + timedelta(minutes = assignment['TASK_DURATION'].item()) <= curr_time:
                 finish_threshold = True
 
-            for employee in curr_employees:
-                #print(assignment['AgentID'])
-                #sys.exit(0)
-                #print(employee)
-                #sys.exit(0)
-                if assignment['AgentID'] in curr_employees['AgentID']:
-                    employee_present_flag = True
+            if assignment['AgentID'] in curr_employees['AgentID'].values:
+                employee_present = True
             
             # Change status of task if employee left without finishing
             # TASK:         PROCESSING -> READY
             # TASK:         PROCESSING -> MISSED
-            # EMPLOYEE:     BUSY -> -    
-            if not employee_present_flag and not finish_threshold:
+            # EMPLOYEE:     BUSY -> -
+            if not employee_present and not finish_threshold:
                 print('Employee ', assignment['AgentID'], 'left without finihsing the task!')
                 self.curr_assignments.remove(assignment)
                 self.task_df.loc[self.task_df['UUID']==assignment.get('UUID'),'Status'] = 'READY'
 
             # If time elapsed, mask task completed. For now, it does not matter if the employee left or not (t < 15min)
             elif finish_threshold:
-
                 print('Task ', assignment['UUID'], ' finished!')
-
-                self.finished_tasks.append({'UUID':assignment['UUID'], 'finished_time':curr_time, 'employee':1})
+                self.finished_tasks.append({'UUID':assignment['UUID'], 'finished_time':curr_time, 'employee':assignment['AgentID']})
                 self.curr_assignments.remove(assignment)
-
                 self.task_df.loc[self.task_df['UUID']==assignment.get('UUID'),'Status'] = 'FINISHED'
-                self.employee_df.loc[self.employee_df['AgentID']==assignment.get('AgentID'),'Status'] = 'READY'
+                self.employee_df.loc[self.employee_df['AgentID']==assignment.get('AgentID'),'agent_state'] = 'READY'
 
-            # Task still in progress, no change in the status of the employee and task.    
+            # Task still in progress, no change in the status of the employee or task df entry 
             else:
                 continue
 
@@ -117,25 +102,36 @@ class OaasEnv(Env):
         '''
         This function populates the self.task_df with tasks and changes their status to READY
         while also incorporating the metadata from the task manager.
+
+        Input:     Tasks                        pd.Dataframe()
         '''
 
         for curr_task in range(len(curr_tasks)):
             
             if self.task_df.loc[self.task_df['UUID']==curr_tasks.loc[curr_task].get('UUID')]['Status'].item() == 'OUT':
                 self.task_df.loc[self.task_df['UUID']==curr_tasks.loc[curr_task].get('UUID'),'Status'] = 'READY'
-
                 for metadata in curr_tasks:
-                    self.task_df.loc[self.task_df['UUID']==curr_tasks.loc[curr_task].get('UUID'),metadata] = curr_tasks.loc[curr_task].get(metadata)
+                    if metadata == 'TASK_LOCATION':
+                        self.task_df.loc[self.task_df['UUID']==curr_tasks.loc[curr_task].get('UUID'),metadata] = return_task_loc(curr_tasks.loc[curr_task].get(metadata))
+                    else:
+                        self.task_df.loc[self.task_df['UUID']==curr_tasks.loc[curr_task].get('UUID'),metadata] = curr_tasks.loc[curr_task].get(metadata)
+
+            elif self.task_df.loc[self.task_df['UUID']==curr_tasks.loc[curr_task].get('UUID')]['Status'].item() == 'READY':
+                for metadata in curr_tasks:
+                    if metadata == 'TASK_LOCATION':
+                        self.task_df.loc[self.task_df['UUID']==curr_tasks.loc[curr_task].get('UUID'),metadata] = return_task_loc(curr_tasks.loc[curr_task].get(metadata))
+                    else:
+                        self.task_df.loc[self.task_df['UUID']==curr_tasks.loc[curr_task].get('UUID'),metadata] = curr_tasks.loc[curr_task].get(metadata)
 
     def accept_new_employees(self, curr_employees):
-
         '''
         This function populates the self.employee_df with employees and changes status of fresh 
         new employees that haven't been assigned a task to READY and to employees that left the store 
         to OUT while also incorporating the metadata from the task manager.
-        '''
 
-        self.employee_df = create_employee_df(self.employee_list)
+        Input:     Employees                    pd.Dataframe()
+        '''
+        #self.employee_df = create_employee_df(self.employee_list)
         self.employee_df['Location'] = self.employee_df['Location'].astype('object')
 
         for curr_employee in range(len(curr_employees)):
@@ -144,10 +140,19 @@ class OaasEnv(Env):
             
             if self.employee_df.loc[self.employee_df['AgentID']==curr_employee_id]['agent_state'].item() == 'OUT':
                 self.employee_df.loc[self.employee_df['AgentID']==curr_employee_id,'agent_state'] = 'READY'
-                self.employee_df.loc[self.employee_df['AgentID']==curr_employee_id,'Location'] = [curr_employees.loc[curr_employee,'Location']]
+                self.employee_df.loc[self.employee_df['AgentID']==curr_employee_id,'Location'] = str(curr_employees.loc[curr_employee,'Location'])
                 self.employee_df.loc[self.employee_df['AgentID']==curr_employee_id,'Skillset'] = 'ALL'
 
     def step(self, action, sched_int, curr_time, curr_tasks):
+        '''
+        Takes a step in the environment.
+
+        Inputs:     Employee/Task Matching      [dict(), dict(), ... , dict()]
+                    Schedule interval           int()
+        Outputs:    State, reward, done, info   [pd.DataFrame(), pd.DataFrame()], float(), bool(), dict()
+        '''
+
+        reward = 0
 
         for assignment in action:
             new_task_flag = True
@@ -155,27 +160,44 @@ class OaasEnv(Env):
             for prev_assignments in self.curr_assignments:
                 if assignment['UUID'] == prev_assignments['UUID']:
                     new_task_flag = False
-            
-            if new_task_flag == False:
-                print("attempting to do a task that is already being done")
-            else:
-                
-                self.curr_assignments.append({'UUID': assignment['UUID'], 'AgentID': assignment['AgentID'], 'TIME_ASSIGNED':curr_time,
-                                                'TASK_DURATION':curr_tasks.loc[curr_tasks['UUID']==assignment['UUID'],'TASK_DURATION']})
-
-                self.task_df.loc[self.task_df['UUID']==assignment.get('UUID'),'Status'] = 'PROCESSING'
-                self.employee_df.loc[self.employee_df['AgentID']==assignment.get('AgentID'),'Status'] = 'BUSY'
-                print("Scheduled a new task ", assignment['UUID'],' to ', assignment['AgentID'])
-                print(self.task_df.loc[self.task_df['UUID']==assignment.get('UUID')])
-                print(self.employee_df.loc[self.employee_df['AgentID']==assignment.get('AgentID')])
-                print("Assingment history = ",self.curr_assignments)            
         
+            if new_task_flag == False:
+                print("[WRONG ACTION]: Attempting to do a task that is already being done!")
+                #reward=-10
 
+            elif self.task_df.loc[self.task_df['UUID']==assignment['UUID']]['Status'].item() == 'FINISHED':
+                print("[WRONG ACTION]: Attempting to do a finished task!")
+                #reward=-10
+
+            else:
+                self.curr_assignments.append({'UUID': assignment['UUID'], 'AgentID': assignment['AgentID'], 'TIME_ASSIGNED':curr_time,
+                                                'TASK_DURATION':curr_tasks.loc[curr_tasks['UUID']==assignment['UUID'],'TASK_DURATION'].values[0]})
+                                                
+                self.task_df.loc[self.task_df['UUID']==assignment.get('UUID'),'Status'] = 'PROCESSING'
+                self.employee_df.loc[self.employee_df['AgentID']==assignment.get('AgentID'),'agent_state'] = 'BUSY'
+                
+                empl_coord = self.employee_df.loc[self.employee_df['AgentID']==assignment.get('AgentID'),'Location'].item()
+                task_coord = self.task_df.loc[self.task_df['UUID']==assignment.get('UUID'),'TASK_LOCATION'].item()
+                #print(task_coord)
+                #sys.exit(0)
+                empl_tuple_coord = tuple_from_string(empl_coord)
+                print("trying with: ",task_coord)
+                task_tuple_coord = tuple_from_string(task_coord)
+
+                dist_penalty = len(astar(self.floorplan, empl_tuple_coord, task_tuple_coord))
+                print("Employee walked from ", empl_tuple_coord, "to ",task_tuple_coord, "covering a distance of ",dist_penalty)
+                self.employee_df.loc[self.employee_df['AgentID']==assignment.get('AgentID'),'Location'] = self.task_df.loc[self.task_df['UUID']==assignment.get('UUID'),'TASK_LOCATION'].item()
+                #print(self.employee_df.loc[self.employee_df['AgentID']==assignment.get('AgentID'),'Location'])
+                #sys.exit(0)
+                #print(self.task_df.loc[self.task_df['UUID']==assignment.get('UUID')])
+                #print(self.employee_df.loc[self.employee_df['AgentID']==assignment.get('AgentID')])
+                #print("Assingment history = ",self.curr_assignments)   
+                reward-=dist_penalty         
+        
         new_env_state = []
         new_env_state.append(self.employee_df)
         new_env_state.append(self.task_df)
 
-        reward = 0
         done = False
         info = {}
 
@@ -260,22 +282,3 @@ class OaasEnv(Env):
         self.observation.append(self.task_dict['task1'].coords[1])
 
         return self.observation
-
-    def save_video(self):
-
-        save_size = 0
-        img_array = []
-        for i in range(25):
-            filename = './renders/live_render'+str(i)+'.png'
-            img = cv2.imread(filename)
-            height, width, layers = img.shape
-            size = (width,height)
-            save_size = size
-            img_array.append(img)
-        
-        
-        out = cv2.VideoWriter('project.avi',cv2.VideoWriter_fourcc(*'DIVX'), 2, save_size)
-        
-        for i in range(len(img_array)):
-            out.write(img_array[i])
-        out.release()

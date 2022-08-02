@@ -16,6 +16,19 @@ WORKDIR /Workspace
 RUN pip install gym
 RUN pip install matplotlib
 RUN pip install pyyaml
+RUN pip install pandas
+RUN pip install torch
+RUN pip install wandb
+RUN pip install opencv-python
+RUN apt-get update
+#ENV DEBIAN_FRONTEND=noninteractive 
+RUN ln -snf /usr/share/zoneinfo/$CONTAINER_TIMEZONE /etc/localtime && echo $CONTAINER_TIMEZONE > /etc/timezone
+RUN apt-get install -y ffmpeg
+RUN apt-get install libsm6 -y
+RUN apt-get install libxext6 -y
+RUN pip install networkx
+RUN pip install dataframe-image
+RUN pip install seaborn
 #RUN pip install pyqt5
 #RUN sudo apt-get install python-tk
 # Adding our python file to the root folder of the container
